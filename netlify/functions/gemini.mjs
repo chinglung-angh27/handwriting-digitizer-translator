@@ -4,7 +4,7 @@
 // Provider switch: if OPENROUTER_API_KEY is set, requests go through OpenRouter
 // (free-tier vision models). Otherwise falls back to Gemini with GEMINI_API_KEY.
 
-const OPENROUTER_MODEL = "google/gemma-4-31b-it:free";
+const OPENROUTER_MODEL = "minimax/minimax-m3:free";
 const GEMINI_MODEL = "gemini-3.6-flash";
 
 const CORS_HEADERS = {

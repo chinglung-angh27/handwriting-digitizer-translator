@@ -13,7 +13,7 @@ const geminiDevProxy = (mode: string): Plugin => ({
     const useOpenRouter = Boolean(env.OPENROUTER_API_KEY);
     const apiKey = useOpenRouter ? env.OPENROUTER_API_KEY : env.GEMINI_API_KEY;
     const GEMINI_MODEL = 'gemini-3.6-flash';
-    const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free';
+    const OPENROUTER_MODEL = 'minimax/minimax-m3:free';
 
     // Convert Gemini-style contents to OpenAI chat messages.
     const toOpenRouterMessages = (contents: any) => {
