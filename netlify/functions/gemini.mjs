@@ -41,6 +41,15 @@ export async function handler(event) {
     return json(400, { error: "Missing 'contents' in request body." });
   }
 
+  // REST API needs contents = array of {parts:[...]}. SDK accepted raw strings;
+  // raw HTTP does not — normalize here so both shapes work.
+  let contents = payload.contents;
+  if (typeof contents === "string") {
+    contents = [{ parts: [{ text: contents }] }];
+  } else if (!Array.isArray(contents) && contents.parts) {
+    contents = [contents];
+  }
+
   try {
     const res = await fetch(`${API_BASE}/models/${MODEL}:generateContent`, {
       method: "POST",
@@ -48,7 +57,7 @@ export async function handler(event) {
         "Content-Type": "application/json",
         "x-goog-api-key": apiKey,
       },
-      body: JSON.stringify({ contents: payload.contents }),
+      body: JSON.stringify({ contents }),
     });
 
     const data = await res.json().catch(() => ({}));
