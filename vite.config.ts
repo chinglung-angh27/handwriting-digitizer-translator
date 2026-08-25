@@ -1,11 +1,58 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(({ mode }) => {
+// Dev-only middleware so `npm run dev` works without Netlify Functions.
+// Mirrors netlify/functions/gemini.mjs — key stays server-side in dev too.
+const geminiDevProxy = (mode: string): Plugin => ({
+  name: 'gemini-dev-proxy',
+  configureServer(server) {
     const env = loadEnv(mode, '.', '');
+    const apiKey = env.GEMINI_API_KEY;
+    const MODEL = 'gemini-2.5-flash';
+
+    server.middlewares.use('/api/gemini', async (req, res) => {
+      if (!apiKey) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'GEMINI_API_KEY not set in .env.local' }));
+        return;
+      }
+      let body = '';
+      req.on('data', (c) => { body += c; });
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const apiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
+              body: JSON.stringify({ contents: payload.contents }),
+            },
+          );
+          const data = await apiRes.json().catch(() => ({}));
+          const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+          res.statusCode = apiRes.ok && text ? 200 : apiRes.status === 429 ? 429 : 502;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(apiRes.ok && text ? { text } : { error: data?.error?.message || `Gemini API error (HTTP ${apiRes.status})` }));
+        } catch (err) {
+          console.error('gemini-dev-proxy error:', err);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Failed to reach Gemini API.' }));
+        }
+      });
+    });
+  },
+});
+
+export default defineConfig(({ mode }) => {
     return {
       base: './',
       server: {
@@ -38,12 +85,9 @@ export default defineConfig(({ mode }) => {
           workbox: {
             globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp}'],
           },
-        })
+        }),
+        geminiDevProxy(mode),
       ],
-      define: {
-        'process.env.API_KEY': JSON.stringify(process.env.GEMINI_API_KEY ?? env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY ?? env.GEMINI_API_KEY)
-      },
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
