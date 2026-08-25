@@ -2,7 +2,7 @@
 
 **Handwriting AI** is a modern web application that allows users to capture, digitize, and translate handwritten or printed notes instantly using the power of Generative AI.
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Deploy_to_Vercel-000?logo=vercel)](https://vercel.com/new/clone?repository-url=https://github.com/your-username/handwriting-digitizer-translator)
+[![Live Demo](https://img.shields.io/badge/Live-handwritingaitool.netlify.app-00C7B7?logo=netlify)](https://handwritingaitool.netlify.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://reactjs.org/)
@@ -22,13 +22,14 @@
 
 ## 🌐 Live Demo
 
-**[View Live Demo →](https://your-project.vercel.app)** *(Deploy your own using the button above)*
+**[https://handwritingaitool.netlify.app](https://handwritingaitool.netlify.app/)**
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: [React](https://reactjs.org/) 19 + [Vite](https://vitejs.dev/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) v4
 - **AI Engine**: [Google Gemini AI](https://ai.google.dev/) (Gemini 2.5 Flash)
+- **Backend**: Netlify Functions (serverless proxy — API key never reaches the browser)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **PWA**: [vite-plugin-pwa](https://github.com/vite-pwa/vite-plugin-pwa)
 - **Toasts**: [react-hot-toast](https://react-hot-toast.com/)
@@ -44,7 +45,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/handwriting-digitizer-translator.git
+   git clone https://github.com/chinglung-angh27/handwriting-digitizer-translator.git
    cd handwriting-digitizer-translator
    ```
 
@@ -54,10 +55,12 @@
    ```
 
 3. **Environment Configuration**
-   Create a `.env` file in the root directory and add your API key:
+   Create a `.env.local` file in the root directory and add your API key:
    ```env
-   VITE_GEMINI_API_KEY=your_api_key_here
+   GEMINI_API_KEY=your_api_key_here
    ```
+   The key is read only by server-side code (Netlify Function in production,
+   Vite dev middleware locally) — it is never bundled into client JavaScript.
 
 4. **Run the application**
    ```bash
@@ -65,18 +68,34 @@
    ```
    Open `http://localhost:3000` in your browser.
 
-## 🚀 Deploy to Vercel (Free)
+## 🚀 Deploy to Netlify (Free)
+
+The repo ships with everything needed — `netlify.toml` plus a serverless
+function at `netlify/functions/gemini.mjs` that proxies Gemini requests so
+your API key stays secret.
 
 1. Push this repo to GitHub.
-2. Go to [vercel.com](https://vercel.com) and sign in with GitHub.
-3. Click **Add New... → Project** → Import this repo.
-4. Build settings auto-detect (Vite). Output directory: `dist`.
-5. In **Environment Variables**, add:
-   - `GEMINI_API_KEY` = your Gemini API key
-6. Click **Deploy**.
-7. Your app is live at `https://your-project.vercel.app` 🎉
+2. Go to [netlify.com](https://netlify.com) and sign in with GitHub.
+3. **Add new site → Import an existing project** → pick this repo.
+4. Build settings auto-detect from `netlify.toml`:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+   - Functions directory: `netlify/functions`
+5. In **Site configuration → Environment variables**, add:
+   - `GEMINI_API_KEY` = your Gemini API key (**exact name, all caps**)
+6. **Deploys → Trigger deploy → Clear cache and deploy site**.
+7. Your app is live at `https://<site-name>.netlify.app` 🎉
 
-The `vercel.json` handles SPA routing automatically.
+### Architecture note
+
+```
+Browser ──POST /api/gemini──▶ Netlify Function ──▶ Gemini API
+                                     ▲
+                        GEMINI_API_KEY lives here only
+```
+
+The client never sees the key. `/api/*` redirects to the function before the
+SPA catch-all, so deep links still work.
 
 ## 📖 How It Works
 
