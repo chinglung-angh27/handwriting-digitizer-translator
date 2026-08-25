@@ -1,0 +1,103 @@
+// This pseudocode describes the main logic of the
+// Handwriting Digitizer & Translator app
+
+FUNCTION InitializeApp():
+  READ apiKey FROM environment("GEMINI_API_KEY")
+  IF apiKey IS EMPTY THEN:
+    RAISE ERROR "Set GEMINI_API_KEY in .env.local"
+  END IF
+  CREATE genaiClient WITH apiKey
+  RETURN genaiClient
+END FUNCTION
+
+FUNCTION FileToGenerativePart(base64, mimeType):
+  RETURN { inlineData: { data: base64, mimeType: mimeType } }
+END FUNCTION
+
+FUNCTION ExtractTextFromImage(genaiClient, base64Image, mimeType):
+  SET imagePart TO FileToGenerativePart(base64Image, mimeType)
+  SET prompt TO "Extract all handwritten text. Return only the text."
+  SET response TO genaiClient.generateContent(
+    model = "gemini-2.5-flash",
+    parts = [ imagePart, { text: prompt } ]
+  )
+  IF response.text IS EMPTY THEN:
+    RAISE ERROR "No text extracted from image"
+  END IF
+  RETURN response.text
+END FUNCTION
+
+FUNCTION TranslateText(genaiClient, textToTranslate, targetLanguage):
+  SET prompt TO "Translate the following text to " + targetLanguage + ":\n\n" + textToTranslate + "\n\nOnly return the translated text."
+  SET response TO genaiClient.generateContent(
+    model = "gemini-2.5-flash",
+    contents = prompt
+  )
+  IF response.text IS EMPTY THEN:
+    RAISE ERROR "Translation failed"
+  END IF
+  RETURN response.text
+END FUNCTION
+
+// Main program (App.tsx)
+FUNCTION Main():
+  SET genaiClient TO InitializeApp()
+
+  // UI state
+  SET base64Image TO NULL
+  SET mimeType TO NULL
+  SET extractedText TO NULL
+  SET translatedText TO NULL
+  SET targetLanguage TO "English"
+  SET loading TO FALSE
+  SET error TO NULL
+
+  // Event: user uploads image
+  ON ImageUpload(file):
+    IF file IS NOT IMAGE THEN:
+      SET error TO "Please upload an image file"
+      EXIT EVENT
+    END IF
+    SET mimeType TO DetectMimeType(file)
+    SET base64Image TO ConvertFileToBase64(file)
+    SET loading TO TRUE
+    SET error TO NULL
+    TRY:
+      SET extractedText TO ExtractTextFromImage(genaiClient, base64Image, mimeType)
+    CATCH e:
+      SET error TO e.message
+      SET extractedText TO NULL
+    END TRY
+    SET loading TO FALSE
+  END EVENT
+
+  // Event: user changes target language
+  ON LanguageChange(newLanguage):
+    SET targetLanguage TO newLanguage
+    IF extractedText IS NOT NULL THEN:
+      SET loading TO TRUE
+      SET error TO NULL
+      TRY:
+        SET translatedText TO TranslateText(genaiClient, extractedText, targetLanguage)
+      CATCH e:
+        SET error TO e.message
+        SET translatedText TO NULL
+      END TRY
+      SET loading TO FALSE
+    END IF
+  END EVENT
+
+  // Render
+  DISPLAY UploadArea, LanguageSelector, Loader(loading), ErrorBanner(error)
+  DISPLAY ResultCard(extractedText, translatedText)
+END FUNCTION
+
+// Helper stubs used by UI layer
+FUNCTION DetectMimeType(file):
+  RETURN file.mimeType
+END FUNCTION
+
+FUNCTION ConvertFileToBase64(file):
+  // Browser FileReader or similar
+  RETURN BASE64_STRING_OF(file)
+END FUNCTION

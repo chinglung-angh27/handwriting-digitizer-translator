@@ -1,0 +1,7 @@
+{
+  "name": "Handwriting Digitizer & Translator",
+  "description": "A web application that uses a camera or image upload to perform handwriting recognition (OCR) and translates the extracted text into a desired language. This tool is designed for digitizing notes across various regional languages.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
