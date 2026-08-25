@@ -10,7 +10,7 @@
 ## 🚀 Features
 
 - **📸 Multi-Modal Input**: Upload images (PNG, JPG, WEBP) or use your device's camera to capture notes in real-time.
-- **🔍 AI-Powered OCR**: Leverages Google's Gemini 2.5 Flash model to extract text from images, supporting both printed and handwritten scripts across multiple languages.
+- **🔍 AI-Powered OCR**: Extracts text from images, supporting both printed and handwritten scripts across multiple languages (Gemini, or any OpenRouter free vision model).
 - **🌐 Instant Translation**: Translate extracted text into 20+ target languages seamlessly.
 - **✨ Modern UI**: A clean, responsive interface built with React and Tailwind CSS, featuring a glassmorphism design and smooth transitions.
 - **📱 Mobile Ready**: Optimized for mobile browsers with native camera integration.
@@ -28,7 +28,7 @@
 
 - **Frontend**: [React](https://reactjs.org/) 19 + [Vite](https://vitejs.dev/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) v4
-- **AI Engine**: [Google Gemini AI](https://ai.google.dev/) (Gemini 2.5 Flash)
+- **AI Engine**: [Google Gemini](https://ai.google.dev/) (Gemini 3.6 Flash) or [OpenRouter](https://openrouter.ai/) free vision models — auto-selected by which API key is configured
 - **Backend**: Netlify Functions (serverless proxy — API key never reaches the browser)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **PWA**: [vite-plugin-pwa](https://github.com/vite-pwa/vite-plugin-pwa)
@@ -55,12 +55,14 @@
    ```
 
 3. **Environment Configuration**
-   Create a `.env.local` file in the root directory and add your API key:
+   Create a `.env.local` file in the root directory and add one of:
    ```env
-   GEMINI_API_KEY=your_api_key_here
+   GEMINI_API_KEY=your_gemini_key_here
+   # or (takes priority if both set):
+   OPENROUTER_API_KEY=sk-or-v1-...
    ```
-   The key is read only by server-side code (Netlify Function in production,
-   Vite dev middleware locally) — it is never bundled into client JavaScript.
+   Keys are read only by server-side code (Netlify Function in production,
+   Vite dev middleware locally) — they are never bundled into client JavaScript.
 
 4. **Run the application**
    ```bash
@@ -81,8 +83,9 @@ your API key stays secret.
    - Build command: `npm run build`
    - Publish directory: `dist`
    - Functions directory: `netlify/functions`
-5. In **Site configuration → Environment variables**, add:
+5. In **Site configuration → Environment variables**, add one of:
    - `GEMINI_API_KEY` = your Gemini API key (**exact name, all caps**)
+   - `OPENROUTER_API_KEY` = your OpenRouter key (takes priority if both set)
 6. **Deploys → Trigger deploy → Clear cache and deploy site**.
 7. Your app is live at `https://<site-name>.netlify.app` 🎉
 

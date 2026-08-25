@@ -10,14 +10,29 @@ const geminiDevProxy = (mode: string): Plugin => ({
   name: 'gemini-dev-proxy',
   configureServer(server) {
     const env = loadEnv(mode, '.', '');
-    const apiKey = env.GEMINI_API_KEY;
-    const MODEL = 'gemini-2.5-flash';
+    const useOpenRouter = Boolean(env.OPENROUTER_API_KEY);
+    const apiKey = useOpenRouter ? env.OPENROUTER_API_KEY : env.GEMINI_API_KEY;
+    const GEMINI_MODEL = 'gemini-3.6-flash';
+    const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free';
+
+    // Convert Gemini-style contents to OpenAI chat messages.
+    const toOpenRouterMessages = (contents: any) => {
+      const parts = Array.isArray(contents) ? contents.flatMap((c: any) => c.parts || []) : contents.parts || [];
+      return [{
+        role: 'user',
+        content: parts.map((p: any) =>
+          p.text
+            ? { type: 'text', text: p.text }
+            : { type: 'image_url', image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } },
+        ),
+      }];
+    };
 
     server.middlewares.use('/api/gemini', async (req, res) => {
       if (!apiKey) {
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: 'GEMINI_API_KEY not set in .env.local' }));
+        res.end(JSON.stringify({ error: 'No API key set in .env.local (OPENROUTER_API_KEY or GEMINI_API_KEY)' }));
         return;
       }
       let body = '';
@@ -34,22 +49,35 @@ const geminiDevProxy = (mode: string): Plugin => ({
           } else if (!Array.isArray(contents) && contents.parts) {
             contents = [contents];
           }
-          const apiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-            {
+          let apiRes: Response, text = '', errName = 'AI';
+          if (useOpenRouter) {
+            apiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
+              headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: OPENROUTER_MODEL, messages: toOpenRouterMessages(contents), max_tokens: 2048 }),
+            });
+            const data = await apiRes.json().catch(() => ({} as any));
+            if (!apiRes.ok) errName = 'OpenRouter';
+            else text = data?.choices?.[0]?.message?.content || '';
+          } else {
+            apiRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': apiKey,
+                },
+                body: JSON.stringify({ contents }),
               },
-              body: JSON.stringify({ contents }),
-            },
-          );
-          const data = await apiRes.json().catch(() => ({}));
-          const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
-          res.statusCode = apiRes.ok && text ? 200 : apiRes.status === 429 ? 429 : 502;
+            );
+            const data = await apiRes.json().catch(() => ({} as any));
+            if (!apiRes.ok) errName = 'Gemini';
+            else text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || '';
+          }
+          res.statusCode = apiRes.ok && text.trim() ? 200 : apiRes.status === 429 ? 429 : 502;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(apiRes.ok && text ? { text } : { error: data?.error?.message || `Gemini API error (HTTP ${apiRes.status})` }));
+          res.end(JSON.stringify(apiRes.ok && text.trim() ? { text } : { error: (apiRes.status === 429 ? 'Rate limit reached — try again in a minute.' : null) || `${errName} API error (HTTP ${apiRes.status})` }));
         } catch (err) {
           console.error('gemini-dev-proxy error:', err);
           res.statusCode = 500;
