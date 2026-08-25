@@ -25,6 +25,15 @@ const geminiDevProxy = (mode: string): Plugin => ({
       req.on('end', async () => {
         try {
           const payload = JSON.parse(body || '{}');
+          if (!payload?.contents) throw new Error('Missing contents');
+          // REST API needs contents = array of {parts:[...]}; normalize like
+          // netlify/functions/gemini.mjs does.
+          let contents = payload.contents;
+          if (typeof contents === 'string') {
+            contents = [{ parts: [{ text: contents }] }];
+          } else if (!Array.isArray(contents) && contents.parts) {
+            contents = [contents];
+          }
           const apiRes = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
             {
@@ -33,7 +42,7 @@ const geminiDevProxy = (mode: string): Plugin => ({
                 'Content-Type': 'application/json',
                 'x-goog-api-key': apiKey,
               },
-              body: JSON.stringify({ contents: payload.contents }),
+              body: JSON.stringify({ contents }),
             },
           );
           const data = await apiRes.json().catch(() => ({}));
